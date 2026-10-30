@@ -1,0 +1,10 @@
+{
+    "sif_file": "docker_image",
+    "max_agents_per_job": 30,
+    "clusters": {
+        "deigo": {"partition": "compute", "time": "96:00:00", "mem": "50G",
+                  "gres": null, "module": "module load singularity", "nv": ""},
+        "saion": {"partition": "taniu", "time": "48:00:00", "mem": "490G",
+                  "gres": "gpu:4", "module": "module load singularity cuda", "nv": " --nv"}
+    }
+}
