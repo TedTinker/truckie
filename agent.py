@@ -2,7 +2,7 @@
 #------------------
 # truckie, on the new architecture.
 #
-# Contract with the cluster framework:
+# Contract with the cluster framework (the same as curious_maze):
 #   main.py builds   Agent(args = args, i = i)   and calls   agent.training(q).
 #   training() puts (i, fraction_done) on q, which main.py prints as a progress bar.
 #   save_dicts() writes value_dict_###.pickle and min_max_dict_###.pickle into
@@ -11,8 +11,8 @@
 #   are checked once per epoch.
 #
 # The saved dictionary keeps the original communication project's plot_dict keys
-# (wins_*, gen_wins_*, rolled_*, accumulated_*, vision_loss, critics_loss, ...).
-# The package's own training logs are saved beside them.
+# (wins_*, gen_wins_*, rolled_*, accumulated_*, vision_loss, critics_loss, ...), so
+# plotting.py works unchanged. The package's own training logs are saved beside them.
 #
 # Following the original agent.py:
 #   - One processor, 'all': every allowed task, colour and shape, two objects, parenting.
@@ -213,7 +213,7 @@ class Agent:
             self.base_etas[name] = (eta if curious else 0.) * args.dkl_max
             inner_state_scalars[name] = {
                 'upsilon_prior' : scaler,
-                'upsilon_posterior' : scaler,
+                'upsilon_posterior' : scaler * POSTERIOR_ACCURACY,
                 'beta' : beta,
                 'eta_before_clamp' : 1. / args.dkl_max,
                 'eta' : self.base_etas[name]}
@@ -252,7 +252,7 @@ class Agent:
             dict_of_action_scalar_dicts = {
                 ACTION_NAME : {
                     'target_entropy' : args.target_entropy * n_actions,
-                    'action_cost' : args.action_cost,     
+                    'action_cost' : args.action_cost,     # Isotropic; the original's prior was N(0, LL^T).
                     'initial_alpha' : initial_alpha,
                     'lr_alpha' : lr_alpha,
                     'delta' : 0.}},
@@ -574,7 +574,8 @@ class Agent:
                 step_dict = self.agent.step_in_episode(
                     None if dreamed else real_observation,
                     use_posterior = not dreamed,
-                    deterministic = deterministic)
+                    deterministic = deterministic,
+                    predict = True)
 
                 if user_action:
                     adjusted = adjust_action(step_dict['action'][ACTION_NAME].clone()).to(
@@ -603,7 +604,8 @@ class Agent:
             final_observation = self.to_observation(processor.obs())
             dreamed = self.wants_to_dream(dreaming, view)
             step_dict = self.agent.step_in_episode(
-                None if dreamed else final_observation, use_posterior = not dreamed, deterministic = deterministic)
+                None if dreamed else final_observation, use_posterior = not dreamed, deterministic = deterministic,
+                predict = True)
             record(step_dict, final_observation, dreamed, step + 1)
             show(step + 1, step_dict, final_observation, last_step = True)
             processor.done()

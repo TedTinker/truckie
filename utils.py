@@ -80,8 +80,6 @@ def cpu_memory_usage():
     mem_usage_gb = mem_usage_bytes / (1024 ** 3)
     print('memory use:', round(mem_usage_gb, 3), 'gigabytes')
 
-#%%
-
 
 
 #%%
