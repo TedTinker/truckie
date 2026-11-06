@@ -93,10 +93,10 @@ add_this('e',   {
 # Agents with curiosity.
 add_this('h',   {
     'curiosity' : 'hidden_state',
-    'hidden_state_eta_vision' : .1, 
-    'hidden_state_eta_touch' : 1,
-    'hidden_state_eta_prop' : .3,
-    'hidden_state_eta_feedback_voice' : [0, .3]})    
+    'hidden_state_eta_vision' : .01, 
+    'hidden_state_eta_touch' : .1,
+    'hidden_state_eta_prop' : .03,
+    'hidden_state_eta_feedback_voice' : [0, .03]})    
 
 
 

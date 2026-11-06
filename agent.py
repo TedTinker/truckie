@@ -209,13 +209,13 @@ class Agent:
         curious = args.curiosity == 'hidden_state'
         self.base_etas = {}
         inner_state_scalars = {}
-        for name, (_, _, _, scaler, beta, eta) in self.modalities.items():
+        for name, (_, _, state_size, scaler, beta, eta) in self.modalities.items():
             self.base_etas[name] = (eta if curious else 0.) * args.dkl_max
             inner_state_scalars[name] = {
                 'upsilon_prior' : scaler,
                 'upsilon_posterior' : scaler * POSTERIOR_ACCURACY,
                 'beta' : beta,
-                'eta_before_clamp' : 1. / args.dkl_max,
+                'eta_before_clamp' : 1. / (args.dkl_max * state_size),
                 'eta' : self.base_etas[name]}
 
         # The original's log-probability was the MEAN over the wheels_joints dimensions;
