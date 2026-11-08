@@ -27,7 +27,7 @@ dpi = 50
 # to the raw wins_* / gen_wins_* lists, so they override whatever window the agents
 # used when they saved their rolled_* lists (older jobs saved with window_size=1).
 WIN_ROLLING_WINDOW = 500
-GEN_WIN_ROLLING_WINDOW = 500
+GEN_WIN_ROLLING_WINDOW = 100
 EXCEPTION_ROLLING_WINDOW = 3000
 
 

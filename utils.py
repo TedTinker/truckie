@@ -900,6 +900,8 @@ parser.add_argument('--min_joint_2_angle',              type=float,         defa
                     help='Min pitch angle.')
 parser.add_argument('--max_joint_2_angle',              type=float,         default = 0,
                     help='Max pitch angle.')
+parser.add_argument('--shared_voice_encoder',           type=literal,       default = False,
+                    help='Should the command voice and feedback voice share one encoder?')
 
 
 

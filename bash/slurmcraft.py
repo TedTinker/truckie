@@ -85,7 +85,6 @@ def add_this(name, args):
 # Agents with entropy.
 add_this('e',   {
     'alpha' : 'None', 
-    'action_cost' : [0, .1],
     'target_entropy' : [-2, -1, -.5]})    
 
 
@@ -99,6 +98,8 @@ add_this('h',   {
     'hidden_state_eta_feedback_voice' : [0, .03]})    
 
 
+
+add_this('v', {'shared_voice_encoder' : True})
 
 
 add_this('quick',   {

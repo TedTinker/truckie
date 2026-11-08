@@ -45,7 +45,7 @@ from utils import (
 from arena import Arena
 from processor import Processor
 from truck_models import (
-    Vision_Encoder, Vision_Decoder, Sensor_Encoder, Sensor_Decoder,
+    Vision_Encoder, Vision_Decoder, Sensor_Encoder, Sensor_Decoder, Shared_Builder,
     Voice_Encoder, Voice_Decoder, Wheels_Joints_Encoder, Wheels_Joints_Decoder,
     make_value_decoder)
 
@@ -171,11 +171,19 @@ class Agent:
         prop_decoder = partial(
             Sensor_Decoder, name = 'prop', output_size = args.joint_aspects)
 
+        # The command and feedback voices speak the same language ("TASK COLOR SHAPE"). With
+        # shared_voice_encoder, one encoder reads both: the same sentence gets the same encoding
+        # whichever voice said it, and every sentence trains the same weights.
+        make_voice_encoder = partial(
+            Voice_Encoder, max_voice_len = args.max_voice_len, voice_shape = args.voice_shape,
+            output_size = args.voice_encode_size, char_encode_size = args.char_encode_size,
+            hidden_size = args.hidden_size, dropout = args.dropout)
+        shared_voice_encoder = Shared_Builder(make_voice_encoder) if args.shared_voice_encoder else None
+
         def voice_encoder(name):
-            return partial(
-                Voice_Encoder, name = name, max_voice_len = args.max_voice_len, voice_shape = args.voice_shape,
-                output_size = args.voice_encode_size, char_encode_size = args.char_encode_size,
-                hidden_size = args.hidden_size, dropout = args.dropout)
+            if shared_voice_encoder is not None:
+                return partial(shared_voice_encoder, name = name)
+            return partial(make_voice_encoder, name = name)
 
         def voice_decoder(name):
             return partial(

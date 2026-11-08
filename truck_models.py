@@ -263,6 +263,47 @@ class Voice_Decoder(Shape_to_Shape_Model):
 
 
 #------------------
+# Sharing one module between several names (e.g. one voice encoder for the command and
+# feedback voices). The package files each module under its .name, so each name gets a
+# thin Shared_Module around the same core: the parameters exist once, and both train them.
+# Shared_Builder goes where a class would; it builds the core on its first call.
+#------------------
+
+class Shared_Module(Shape_to_Shape_Model):
+
+    def __init__(self, name, core, verbose = False):
+        super().__init__(
+            name = name,
+            input_shape = core.input_shape,
+            output_shape = core.output_shape,
+            arg_dict = {'core' : core},
+            verbose = verbose)
+
+    def build_model(self, arg_dict):
+        self.core = arg_dict['core']
+
+    def forward(self, value):
+        return self.core(value)
+
+    def loss_func(self, predicted_values, target_values):
+        return self.core.loss_func(predicted_values, target_values)
+
+
+
+class Shared_Builder:
+
+    def __init__(self, make):
+        self.make = make            # A class, or a partial of one.
+        self.core = None
+
+    def __call__(self, name, verbose = False, **kwargs):
+        if self.core is None:
+            self.core = self.make(name = f'shared_{name}', verbose = verbose, **kwargs)
+        return Shared_Module(name, self.core, verbose = verbose)
+
+
+
+#------------------
 # Actions: wheels and joints, (wheels_joints_shape,) in [-1, 1].
 #------------------
 
