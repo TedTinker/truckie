@@ -900,7 +900,7 @@ parser.add_argument('--min_joint_2_angle',              type=float,         defa
                     help='Min pitch angle.')
 parser.add_argument('--max_joint_2_angle',              type=float,         default = 0,
                     help='Max pitch angle.')
-parser.add_argument('--shared_voice_encoder',           type=literal,       default = False,
+parser.add_argument('--shared_voice_encoder',           type=literal,       default = True,
                     help='Should the command voice and feedback voice share one encoder?')
 
 
@@ -994,7 +994,15 @@ parser.add_argument('--lstm',                           type=literal,       defa
 parser.add_argument('--hidden_size',                    type=int,           default = 64,
                     help='Parameters in hidden layers.')   
 parser.add_argument('--pvrnn_mtrnn_size',               type=int,           default = 128,
-                    help='Parameters in hidden layers of PVRNN\'s mtrnn.')   
+                    help='Parameters in hidden layers of PVRNN\'s mtrnn.') 
+parser.add_argument('--layers',                         type=int,           default = 1,
+                    help='Layers in the world model. Layer 0 sees the senses; each higher layer summarises the one below.')
+parser.add_argument('--higher_hidden_size',             type=int,           default = 128,
+                    help='Hidden-state size of each layer above layer 0.')
+parser.add_argument('--higher_state_size',              type=int,           default = 32,
+                    help='Inner-state size of each layer above layer 0.')
+parser.add_argument('--time_constant_ratio',            type=float,         default = 4,
+                    help='Layer i has time constant time_constant_ratio ** i (layer 0: 1). Higher is slower.')  
 
 parser.add_argument('--wheels_joints_encode_size',      type=int,           default = 8,
                     help='Parameters in encoding wheels_joints.')   
@@ -1135,6 +1143,13 @@ parser.add_argument('--prediction_error_eta_feedback_voice', type=float,    defa
 parser.add_argument('--hidden_state_eta_feedback_voice', type=float,        default = 0,
                     help='Nonnegative values, how much to consider hidden_state curiosity for voice.') 
 
+parser.add_argument('--higher_scaler',                  type=float,         default = 1,
+                    help='Relative importance of a higher layer predicting the layer below.')
+parser.add_argument('--beta_higher',                    type=float,         default = .03,
+                    help='Relative importance of complexity for higher layers.')
+parser.add_argument('--hidden_state_eta_higher',        type=float,         default = 0,
+                    help='Nonnegative values, how much to consider hidden_state curiosity for higher layers.')
+
 
 
     # Saving data
@@ -1233,6 +1248,7 @@ def update_args(arg_set):
     arg_set.beta_prop /= arg_set.prop_state_size
     arg_set.beta_command_voice /= arg_set.voice_state_size
     arg_set.beta_feedback_voice /= arg_set.voice_state_size
+    arg_set.beta_higher /= arg_set.higher_state_size
         
     arg_set.min_joint_1_angle = -arg_set.max_joint_1_angle
     arg_set.wheels_joints_shape = 4

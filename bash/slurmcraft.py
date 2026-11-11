@@ -89,17 +89,20 @@ add_this('e',   {
 
 
 
-# Agents with curiosity.
+# Agents with sensory-motor curiosity.
 add_this('h',   {
     'curiosity' : 'hidden_state',
     'hidden_state_eta_vision' : .01, 
     'hidden_state_eta_touch' : .1,
-    'hidden_state_eta_prop' : .03,
-    'hidden_state_eta_feedback_voice' : [0, .03]})    
+    'hidden_state_eta_prop' : .03})    
+
+# Agents with feedback voice curiosity.
+add_this('f',   {
+    'hidden_state_eta_feedback_voice' : .03})    
 
 
 
-add_this('v', {'shared_voice_encoder' : True})
+add_this('layers', {'layers' : [1, 2, 3]})
 
 
 add_this('quick',   {

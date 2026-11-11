@@ -1,6 +1,6 @@
 #%%
 import os
-from copy import deepcopy
+from copy import deepcopy, copy
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.text import TextPath
@@ -295,7 +295,9 @@ def plots(plot_dicts, min_max_dict):
         if plot_dict['args'].exceptions == 0:
             task_name_list = task_name_list[:-1]
 
-        fig2, ax2 = plt.subplots(len(task_name_list), 3, figsize=(30, 30))
+        n_rows = len(task_name_list)
+        fig2, ax2 = plt.subplots(n_rows, 3, figsize=(30, 5 * n_rows),
+                                constrained_layout=True, squeeze=False)
         fig2.suptitle(plot_dict['arg_title'])
         fig2_row_num = 0
 
@@ -342,13 +344,11 @@ def plots(plot_dicts, min_max_dict):
                 if this_win_dict is None:
                     return
                 awesome_plot(here, this_win_dict, 'black', 'WinRate', (0, 100))
-                here.set_ylabel(
-                    'Rolling-Average Gen-Win-Rate' if which_dict == 'gen'
-                    else 'Rolling-Average Win-Rate'
-                )
+                here.set_ylabel('Gen-Win-Rate' if which_dict == 'gen' else 'Win-Rate')
                 here.yaxis.set_major_formatter(FuncFormatter(to_percent))
                 here.yaxis.set_minor_locator(MultipleLocator(5))
                 here.set_xlabel('Epochs')
+                here.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x/1000:.0f}k' if x else '0'))
                 here.set_title(
                     plot_dict['arg_title'] +
                     ('\nRolling-Average Gen-Win-Rate ({})'.format(task_name) if which_dict == 'gen'
@@ -706,6 +706,12 @@ def plots(plot_dicts, min_max_dict):
         feedback_voice_prediction_error_dict = get_quantiles(
             plot_dict, 'feedback_voice_prediction_error_curiosity', levels=[],
              adjust_xs=plot_dict['args'].keep_data)
+        # Proprioception. Older runs may not have saved it.
+        has_prop = ('prop_prediction_error_curiosity' in plot_dict
+                    and 'prop_hidden_state_curiosity' in plot_dict)
+        prop_prediction_error_dict = get_quantiles(
+            plot_dict, 'prop_prediction_error_curiosity', levels=[],
+            adjust_xs=plot_dict['args'].keep_data) if has_prop else None
         prediction_error_dict = get_quantiles(
             plot_dict, 'prediction_error_curiosity', levels=[],
             adjust_xs=plot_dict['args'].keep_data)
@@ -722,9 +728,19 @@ def plots(plot_dicts, min_max_dict):
         feedback_voice_hidden_state_dict = get_quantiles(
             plot_dict, 'feedback_voice_hidden_state_curiosity', levels=[],
             adjust_xs=plot_dict['args'].keep_data)
+        prop_hidden_state_dict = get_quantiles(
+            plot_dict, 'prop_hidden_state_curiosity', levels=[],
+            adjust_xs=plot_dict['args'].keep_data) if has_prop else None
         hidden_state_dict = get_quantiles(
             plot_dict, 'hidden_state_curiosity', levels=[],
             adjust_xs=plot_dict['args'].keep_data)
+
+        # Layers above 0, summed (agent.log_epoch). Runs from before --layers don't have it.
+        has_higher = (getattr(plot_dict['args'], 'layers', 1) > 1
+                      and 'higher_hidden_state_curiosity' in plot_dict)
+        higher_hidden_state_dict = get_quantiles(
+            plot_dict, 'higher_hidden_state_curiosity', levels=[],
+            adjust_xs=plot_dict['args'].keep_data) if has_higher else None
 
         curiosity_min_max = many_min_max([
             min_max_dict['vision_prediction_error_curiosity'],
@@ -736,20 +752,26 @@ def plots(plot_dicts, min_max_dict):
             min_max_dict['command_voice_hidden_state_curiosity'],
             min_max_dict['hidden_state_curiosity'],
             min_max_dict['feedback_voice_prediction_error_curiosity'],
-            min_max_dict['feedback_voice_hidden_state_curiosity']
+            min_max_dict['feedback_voice_hidden_state_curiosity'],
+            min_max_dict.get('higher_hidden_state_curiosity', (None, None)),
+            min_max_dict.get('prop_prediction_error_curiosity', (None, None)),
+            min_max_dict.get('prop_hidden_state_curiosity', (None, None))
         ])
 
         log_vision_prediction_error_dict = get_logs(vision_prediction_error_dict)
         log_touch_prediction_error_dict = get_logs(touch_prediction_error_dict)
         log_command_voice_prediction_error_dict = get_logs(command_voice_prediction_error_dict)
         log_feedback_voice_prediction_error_dict = get_logs(feedback_voice_prediction_error_dict)
+        log_prop_prediction_error_dict = get_logs(prop_prediction_error_dict) if has_prop else None
         log_prediction_error_dict = get_logs(prediction_error_dict)
 
         log_vision_hidden_state_dict = get_logs(vision_hidden_state_dict)
         log_touch_hidden_state_dict = get_logs(touch_hidden_state_dict)
         log_command_voice_hidden_state_dict = get_logs(command_voice_hidden_state_dict)
         log_feedback_voice_hidden_state_dict = get_logs(feedback_voice_hidden_state_dict)
+        log_prop_hidden_state_dict = get_logs(prop_hidden_state_dict) if has_prop else None
         log_hidden_state_dict = get_logs(hidden_state_dict)
+        log_higher_hidden_state_dict = get_logs(higher_hidden_state_dict) if has_higher else None
         
         if curiosity_min_max[0] <= 0:
             log_curiosity_min_max = (0.01, curiosity_min_max[1])
@@ -811,6 +833,15 @@ def plots(plot_dicts, min_max_dict):
                 min_max=this_min_max,
                 letter='R'
             ))
+            if has_prop:
+                handles.append(awesome_plot(
+                    here,
+                    log_prop_prediction_error_dict if log else prop_prediction_error_dict,
+                    'green',
+                    'Proprioception',
+                    min_max=this_min_max,
+                    letter='P'
+                ))
             here.set_ylabel('Prediction Error Curiosity')
             here.set_xlabel('Epochs')
             here.legend(handles=handles)
@@ -869,6 +900,24 @@ def plots(plot_dicts, min_max_dict):
                 min_max=this_min_max,
                 letter='R'
             ))
+            if has_prop:
+                handles.append(awesome_plot(
+                    here,
+                    log_prop_hidden_state_dict if log else prop_hidden_state_dict,
+                    'red',
+                    'Proprioception',
+                    min_max=this_min_max,
+                    letter='P'
+                ))
+            if has_higher:
+                handles.append(awesome_plot(
+                    here,
+                    log_higher_hidden_state_dict if log else higher_hidden_state_dict,
+                    'red',
+                    'Higher layers',
+                    min_max=this_min_max,
+                    letter='H'
+                ))
             here.set_ylabel('Hidden State Curiosity')
             here.set_xlabel('Epochs')
             here.legend(handles=handles)
@@ -961,10 +1010,10 @@ def plots(plot_dicts, min_max_dict):
 plot_dicts, min_max_dict, complete_order = load_dicts(args)
 print("Starting to plot...")
 for i, plot_dict in enumerate(plot_dicts):
-    new_plot_dict = deepcopy(plot_dict)
-    print("Copied")
-    new_plot_dict['args'].agents_for_plotting = [i for i in range(new_plot_dict['args'].agents_for_plotting)]
-    print("Got args")
+    new_plot_dict = plot_dict.copy()
+    new_plot_dict['args'] = copy(plot_dict['args'])
+    new_plot_dict['args'].agents_for_plotting = list(
+        range(new_plot_dict['args'].agents_for_plotting))
     plot_dicts[i] = new_plot_dict
 
 plots(plot_dicts, min_max_dict)

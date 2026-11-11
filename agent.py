@@ -226,6 +226,29 @@ class Agent:
                 'eta_before_clamp' : 1. / (args.dkl_max * state_size),
                 'eta' : self.base_etas[name]}
 
+        # Higher layers (args.layers > 1). Each has no senses of its own: its one inner state,
+        # 'lower_layer_posterior_sample', predicts the posterior sample of the layer below
+        # (MSE summed over that sample's dimensions, so the scaler is divided by its size,
+        # as utils.update_args does for the senses). Layer i updates at most
+        # 1 / time_constant_ratio ** i of its hidden state per step, and its hidden state
+        # feeds into the layer below's. Actor and critics still read layer 0.
+        layers = args.layers
+        hidden_state_sizes = [args.pvrnn_mtrnn_size] + [args.higher_hidden_size] * (layers - 1)
+        time_constants = [args.time_constant_ratio ** i for i in range(layers)]
+        lower_inner_state_size = sum(state_size for (_, _, state_size, _, _, _) in self.modalities.values())
+        list_of_inner_state_scalars = [inner_state_scalars]
+        for i in range(1, layers):
+            upsilon = args.higher_scaler / lower_inner_state_size
+            list_of_inner_state_scalars.append({'lower_layer_posterior_sample' : {
+                'upsilon_prior' : upsilon,
+                'upsilon_posterior' : upsilon * POSTERIOR_ACCURACY,
+                'beta' : args.beta_higher,
+                'eta_before_clamp' : 1. / (args.dkl_max * args.higher_state_size),
+                'eta' : (args.hidden_state_eta_higher if curious else 0.) * args.dkl_max}})
+            lower_inner_state_size = args.higher_state_size
+        no_inputs = [{}] * (layers - 1)
+
+
         # The original's log-probability was the MEAN over the wheels_joints dimensions;
         # the package's is the SUM. To keep alpha and target_entropy meaning what they
         # meant in the original, divide alpha by the number of dimensions and multiply
@@ -236,26 +259,26 @@ class Agent:
             initial_alpha, lr_alpha = max(float(args.alpha) / n_actions, 1e-6), 0.
 
         self.agent = FEP_Agent(
-            hidden_state_sizes = [args.pvrnn_mtrnn_size],
-            time_constants = [1],
+            hidden_state_sizes = hidden_state_sizes,
+            time_constants = time_constants,
 
             list_of_dict_of_prior_input_encoder_class_dicts = [
-                {ACTION_NAME : {'class' : wheels_joints_encoder}}],
+                {ACTION_NAME : {'class' : wheels_joints_encoder}}] + no_inputs,
 
             list_of_dict_of_posterior_input_encoder_class_dicts = [
                 {name : {'class' : encoder, 'decoding_output_size' : state_size}
-                 for name, (encoder, _, state_size, _, _, _) in self.modalities.items()}],
+                 for name, (encoder, _, state_size, _, _, _) in self.modalities.items()}] + no_inputs,
 
             list_of_dict_of_prediction_decoder_class_dicts = [
                 {name : {'class' : decoder}
-                 for name, (_, decoder, _, _, _, _) in self.modalities.items()}],
+                 for name, (_, decoder, _, _, _, _) in self.modalities.items()}] + no_inputs,
 
-            lower_layer_posterior_sample_decoding_output_sizes = [0],
+            lower_layer_posterior_sample_decoding_output_sizes = [0] + [args.higher_state_size] * (layers - 1),
 
             dict_of_action_decoder_class_dicts = {ACTION_NAME : {'class' : wheels_joints_decoder}},
             dict_of_action_encoder_class_dicts = {ACTION_NAME : {'class' : wheels_joints_encoder}},
 
-            list_of_dict_of_inner_state_scalar_dicts = [inner_state_scalars],
+            list_of_dict_of_inner_state_scalar_dicts = list_of_inner_state_scalars,
 
             dict_of_action_scalar_dicts = {
                 ACTION_NAME : {
@@ -295,6 +318,11 @@ class Agent:
             'accuracy_loss' : [],
             'complexity_loss' : [],
             **{f'{name}_loss' : [] for name in OBSERVATION_NAMES},
+
+            'higher_accuracy_loss' : [],        # Layers above 0, summed (0 with one layer).
+            'higher_complexity_loss' : [],
+            'higher_hidden_state_curiosity' : [],
+             **{f'{name}_loss' : [] for name in OBSERVATION_NAMES},
 
             'actor_loss' : [],
             'critics_loss' : [[] for _ in range(args.critics)],
@@ -740,6 +768,21 @@ class Agent:
             pd[f'{name}_prediction_error_curiosity'].append(0.)
         pd['accuracy_loss'].append(accuracy)
         pd['complexity_loss'].append(complexity)
+
+
+        # Layers above 0 (their curiosity is already in epoch_dict['curiosity']).
+        higher_accuracy, higher_complexity, higher_curiosity = 0., 0., 0.
+        name = 'lower_layer_posterior_sample'
+        for i in range(1, len(self.agent.list_of_dict_of_inner_state_scalar_dicts)):
+            key = f'layer_{i}'
+            higher_scalars = self.agent.list_of_dict_of_inner_state_scalar_dicts[i][name]
+            higher_accuracy += epoch_dict['accuracy_losses_prior'][key][name] * higher_scalars['upsilon_prior']
+            higher_complexity += epoch_dict['complexity_losses'][key][name] * higher_scalars['beta']
+            higher_curiosity += epoch_dict['curiosities'][key][name]
+        pd.setdefault('higher_accuracy_loss', []).append(higher_accuracy)
+        pd.setdefault('higher_complexity_loss', []).append(higher_complexity)
+        pd.setdefault('higher_hidden_state_curiosity', []).append(higher_curiosity)
+
         pd['hidden_state_curiosity'].append(epoch_dict['curiosity'])
         pd['prediction_error_curiosity'].append(0.)
         pd['intrinsic_curiosity'].append(epoch_dict['curiosity'])
